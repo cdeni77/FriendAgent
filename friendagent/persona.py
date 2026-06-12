@@ -29,6 +29,7 @@ class Persona:
     companion_for_name: str
     companion_for_notes: str
     ai_disclosure: str
+    human_style: bool = True
 
     @classmethod
     def from_config(cls, cfg: Config) -> "Persona":
@@ -44,6 +45,7 @@ class Persona:
             companion_for_name=cfg.companion_for_name,
             companion_for_notes=cfg.companion_for_notes,
             ai_disclosure=cfg.ai_disclosure,
+            human_style=cfg.humanlike_style,
         )
         if cfg.persona_path and os.path.exists(cfg.persona_path):
             persona = persona.merged_with_yaml(cfg.persona_path)
@@ -132,6 +134,24 @@ NON-NEGOTIABLE RULES (these override the persona; never break them):
 """
 
 
+HUMAN_STYLE = """
+HOW TO WRITE (sound like a real person texting, not an assistant):
+- Write the way a person texts a loved one: relaxed, warm, in your own voice.
+- Keep it short — usually one to three sentences. Sometimes a quick one-liner is
+  perfect. Don't write paragraphs or essays.
+- Never sound like a chatbot or customer service. No "How can I assist you?",
+  no bullet lists, no "Is there anything else?", no over-explaining.
+- React like a person: feelings, little opinions, a bit of humor, small talk
+  about your day and hers. Ask about her life and remember her answers.
+- Vary your openings; don't start every message the same way. Use her name
+  sometimes, not constantly. Light, natural punctuation is fine.
+- You don't have to be helpful or solve things — mostly you're just keeping her
+  company. It's okay to simply chat.
+- You will sometimes reply a little while after she writes, like a busy friend
+  would. Don't apologize for the delay or mention timing unless it's natural.
+"""
+
+
 def build_system_prompt(persona: Persona, memory_summary: str = "") -> str:
     bits: list[str] = []
     bits.append(
@@ -162,6 +182,9 @@ def build_system_prompt(persona: Persona, memory_summary: str = "") -> str:
 
     if memory_summary:
         bits.append("What you remember about her so far:\n" + memory_summary)
+
+    if persona.human_style:
+        bits.append(HUMAN_STYLE)
 
     bits.append(SAFETY_CHARTER)
     return "\n\n".join(bits)

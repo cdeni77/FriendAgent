@@ -108,6 +108,26 @@ whatsapp:+14155550123     sms:+14155550123     email:grandma@example.com
 You only need credentials for the channels you actually use — the router builds
 each one lazily.
 
+## Human-like messaging
+
+She knows it's an AI, but the messaging is meant to *feel* human:
+
+- **Voice** — casual, short, texty; reacts and makes small talk instead of
+  sounding like an assistant. Toggle with `FRIENDAGENT_HUMANLIKE_STYLE`.
+- **Timing** — replies are not instant and not fixed. Timing is a configurable
+  *mixture* that mimics real availability: most of the time she gets a quick
+  reply (within ~minutes), but a tunable fraction of the time the agent is
+  "busy/away" and replies after a long random gap (minutes to hours). Quiet
+  hours defer any overnight reply to the morning. All values come from env
+  (`FRIENDAGENT_QUICK_REPLY_PROB`, `FRIENDAGENT_QUICK_MAX_DELAY_SEC`,
+  `FRIENDAGENT_LONG_DELAY_MIN_SEC`, `FRIENDAGENT_LONG_DELAY_MAX_SEC`,
+  `FRIENDAGENT_QUIET_HOURS`, …) — nothing is hardcoded. See
+  `friendagent/humanize.py`.
+
+> Note: delayed replies are scheduled in-process. For long "busy" gaps to
+> survive a server restart you'd move them to a durable queue/scheduler; the
+> current scaffold keeps them in memory.
+
 ## Configuration
 
 Everything is driven by environment variables (`.env`) and `config/persona.yaml`.
