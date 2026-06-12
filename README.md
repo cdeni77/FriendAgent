@@ -136,9 +136,12 @@ She knows it's an AI, but the messaging is meant to *feel* human:
   Tunable via `FRIENDAGENT_CHECKIN_JITTER_SEC`, `FRIENDAGENT_SPONTANEOUS_*`.
   Quiet hours are always respected. (`friendagent/scheduler.py`)
 
-> Note: delayed replies are scheduled in-process. For long "busy" gaps to
-> survive a server restart you'd move them to a durable queue/scheduler; the
-> current scaffold keeps them in memory.
+> Durable delivery: WhatsApp/SMS replies are **persisted to a SQLite queue**
+> before the (possibly hours-long) wait, so a server restart never drops them.
+> The web server delivers them in-process for snappiness; the scheduler runs a
+> 1-minute backstop that delivers anything still pending after a restart, and an
+> atomic claim guarantees exactly-once. (Run `python -m friendagent.scheduler`
+> for the restart recovery + proactive outreach.)
 
 ## Agentic core (tools)
 

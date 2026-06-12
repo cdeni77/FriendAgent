@@ -66,6 +66,17 @@ class Memory:
             );
             CREATE INDEX IF NOT EXISTS idx_followups_due
                 ON followups(done, due_ts);
+
+            CREATE TABLE IF NOT EXISTS pending_sends (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                due_ts REAL NOT NULL,
+                payload TEXT NOT NULL,
+                created_ts REAL NOT NULL,
+                done INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_pending_due
+                ON pending_sends(done, due_ts);
             """
         )
         self._conn.commit()
@@ -153,6 +164,37 @@ class Memory:
             "UPDATE followups SET done = 1 WHERE id = ?", (followup_id,)
         )
         self._conn.commit()
+
+    # ---- pending sends (durable, restart-safe delivery queue) -----------
+    def enqueue_send(self, user_id: str, due_ts: float, payload: str) -> int:
+        cur = self._conn.execute(
+            "INSERT INTO pending_sends (user_id, due_ts, payload, created_ts, done) "
+            "VALUES (?, ?, ?, ?, 0)",
+            (user_id, due_ts, payload, time.time()),
+        )
+        self._conn.commit()
+        return int(cur.lastrowid)
+
+    def due_sends(self, now_ts: Optional[float] = None) -> list[tuple[int, str, str]]:
+        now_ts = now_ts if now_ts is not None else time.time()
+        rows = self._conn.execute(
+            "SELECT id, user_id, payload FROM pending_sends "
+            "WHERE done = 0 AND due_ts <= ? ORDER BY due_ts",
+            (now_ts,),
+        ).fetchall()
+        return [(r["id"], r["user_id"], r["payload"]) for r in rows]
+
+    def claim_send(self, send_id: int) -> bool:
+        """Atomically claim a pending send. Returns True if WE got it.
+
+        Prevents the in-process fast path and the scheduler backstop from both
+        delivering the same message.
+        """
+        cur = self._conn.execute(
+            "UPDATE pending_sends SET done = 1 WHERE id = ? AND done = 0", (send_id,)
+        )
+        self._conn.commit()
+        return cur.rowcount == 1
 
     def known_user_ids(self) -> list[str]:
         rows = self._conn.execute(

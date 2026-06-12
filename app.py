@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import FileResponse
@@ -30,7 +31,7 @@ from friendagent import delivery, humanize
 from friendagent.channels.email import EmailChannel
 from friendagent.channels.router import ChannelRouter
 from friendagent.companion import Companion
-from friendagent.outbound import OutboundMessage, TEXT
+from friendagent.outbound import OutboundMessage, TEXT, serialize
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("friendagent.app")
@@ -71,7 +72,7 @@ def _initial_delay_seconds(outbound: list[OutboundMessage]) -> float:
 
 
 async def _reply_after_delay(user_id: str, text: str, deliver_fn) -> None:
-    """Generate a reply, wait a human-like amount, then deliver it."""
+    """Generate a reply, wait a human-like amount, then deliver it (email path)."""
     try:
         outbound = await asyncio.to_thread(companion.handle_message, user_id, text)
         delay = _initial_delay_seconds(outbound)
@@ -81,6 +82,29 @@ async def _reply_after_delay(user_id: str, text: str, deliver_fn) -> None:
         await asyncio.to_thread(deliver_fn, outbound)
     except Exception as exc:
         log.error("Delayed reply to %s failed: %s", user_id, exc)
+
+
+async def _reply_persistently(user_id: str, text: str) -> None:
+    """Durable path for chat channels: persist the pending reply, then deliver.
+
+    The reply is enqueued to the DB before the (possibly hours-long) wait, so a
+    restart doesn't drop it — the scheduler's backstop will deliver anything
+    still pending. A claim ensures it's sent exactly once.
+    """
+    try:
+        outbound = await asyncio.to_thread(companion.handle_message, user_id, text)
+        delay = _initial_delay_seconds(outbound)
+        due = time.time() + delay
+        send_id = await asyncio.to_thread(
+            companion.memory.enqueue_send, user_id, due, serialize(outbound)
+        )
+        log.info("Queued reply #%d to %s in %.0fs (%d parts)", send_id, user_id, delay, len(outbound))
+        if delay > 0:
+            await asyncio.sleep(delay)
+        if await asyncio.to_thread(companion.memory.claim_send, send_id):
+            await asyncio.to_thread(delivery.deliver, router, user_id, outbound, companion.cfg)
+    except Exception as exc:
+        log.error("Persistent reply to %s failed: %s", user_id, exc)
 
 
 @app.get("/health")
@@ -104,10 +128,7 @@ async def whatsapp_webhook(request: Request, Body: str = Form(""), From: str = F
     user_id = From or "whatsapp:unknown"
     log.info("Inbound WhatsApp from %s: %s", user_id, Body)
     if companion.cfg.humanize_timing:
-        asyncio.create_task(_reply_after_delay(
-            user_id, Body or "",
-            lambda outs: delivery.deliver(router, user_id, outs, companion.cfg),
-        ))
+        asyncio.create_task(_reply_persistently(user_id, Body or ""))
         return _twiml()
     outbound = await asyncio.to_thread(companion.handle_message, user_id, Body or "")
     return _twiml(_join_text(outbound))
@@ -121,10 +142,7 @@ async def sms_webhook(request: Request, Body: str = Form(""), From: str = Form("
     user_id = f"sms:{From}" if From and not From.startswith("sms:") else (From or "sms:unknown")
     log.info("Inbound SMS from %s: %s", user_id, Body)
     if companion.cfg.humanize_timing:
-        asyncio.create_task(_reply_after_delay(
-            user_id, Body or "",
-            lambda outs: delivery.deliver(router, user_id, outs, companion.cfg),
-        ))
+        asyncio.create_task(_reply_persistently(user_id, Body or ""))
         return _twiml()
     outbound = await asyncio.to_thread(companion.handle_message, user_id, Body or "")
     return _twiml(_join_text(outbound))

@@ -27,6 +27,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from . import delivery, humanize
 from .channels.router import ChannelRouter
 from .companion import Companion
+from .outbound import deserialize
 
 log = logging.getLogger("friendagent.scheduler")
 
@@ -53,6 +54,23 @@ def run_checkins(companion: Companion, router: ChannelRouter, occasion: str | No
             log.info("Check-in (%s) sent to %s", occasion or "general", user_id)
         except Exception as exc:
             log.error("Check-in to %s failed: %s", user_id, exc)
+
+
+def run_due_sends(companion: Companion, router: ChannelRouter) -> None:
+    """Restart-safe backstop: deliver any pending replies whose time has come.
+
+    The web server normally delivers these in-process; this catches anything
+    left pending across a restart. A claim guarantees exactly-once delivery.
+    """
+    for send_id, user_id, payload in companion.memory.due_sends():
+        if not companion.memory.claim_send(send_id):
+            continue  # already delivered by the web process
+        try:
+            outbound = deserialize(payload)
+            delivery.deliver(router, user_id, outbound, companion.cfg)
+            log.info("Backstop-delivered queued reply #%d to %s", send_id, user_id)
+        except Exception as exc:
+            log.error("Backstop delivery #%d to %s failed: %s", send_id, user_id, exc)
 
 
 def run_due_followups(companion: Companion, router: ChannelRouter) -> None:
@@ -125,6 +143,15 @@ def main() -> None:
         id="followups",
     )
     log.info("Follow-up checks every 15min")
+
+    # Restart-safe backstop for queued replies (durable delivery).
+    scheduler.add_job(
+        run_due_sends,
+        IntervalTrigger(minutes=1),
+        args=[companion, router],
+        id="pending-sends",
+    )
+    log.info("Pending-send backstop every 1min")
 
     log.info("Scheduler running. Ctrl-C to stop.")
     try:

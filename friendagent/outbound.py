@@ -5,7 +5,8 @@ over the right channel (with bubbling for text, media URLs for voice/photos).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from typing import Optional
 
 TEXT = "text"
@@ -30,3 +31,11 @@ class OutboundMessage:
     @classmethod
     def photo_msg(cls, caption: str, path: str) -> "OutboundMessage":
         return cls(kind=PHOTO, text=caption, media_path=path)
+
+
+def serialize(messages: list[OutboundMessage]) -> str:
+    return json.dumps([asdict(m) for m in messages])
+
+
+def deserialize(payload: str) -> list[OutboundMessage]:
+    return [OutboundMessage(**d) for d in json.loads(payload)]
