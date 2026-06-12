@@ -31,6 +31,7 @@ from friendagent import delivery, humanize
 from friendagent.channels.email import EmailChannel
 from friendagent.channels.router import ChannelRouter
 from friendagent.companion import Companion
+from friendagent.media.transcribe import compose_inbound_text, transcribe_twilio_media
 from friendagent.outbound import OutboundMessage, TEXT, serialize
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -120,17 +121,34 @@ def media(filename: str):
     return FileResponse(path)
 
 
+async def _inbound_text(form: dict, body: str) -> str:
+    """Resolve the user's text, transcribing an attached voice note if present."""
+    transcript = ""
+    try:
+        if int(form.get("NumMedia", "0") or 0) > 0:
+            ctype = form.get("MediaContentType0", "") or ""
+            url = form.get("MediaUrl0", "") or ""
+            if url and ctype.startswith("audio"):
+                transcript = await asyncio.to_thread(
+                    transcribe_twilio_media, url, ctype, companion.cfg
+                )
+    except Exception as exc:  # never let media handling break the reply
+        log.error("Inbound media handling failed: %s", exc)
+    return compose_inbound_text(body, transcript)
+
+
 @app.post("/webhooks/twilio/whatsapp")
 async def whatsapp_webhook(request: Request, Body: str = Form(""), From: str = Form("")):
     form = dict(await request.form())
     if not _validate_twilio(request, form):
         return Response(status_code=403)
     user_id = From or "whatsapp:unknown"
-    log.info("Inbound WhatsApp from %s: %s", user_id, Body)
+    text = await _inbound_text(form, Body)
+    log.info("Inbound WhatsApp from %s: %s", user_id, text)
     if companion.cfg.humanize_timing:
-        asyncio.create_task(_reply_persistently(user_id, Body or ""))
+        asyncio.create_task(_reply_persistently(user_id, text))
         return _twiml()
-    outbound = await asyncio.to_thread(companion.handle_message, user_id, Body or "")
+    outbound = await asyncio.to_thread(companion.handle_message, user_id, text)
     return _twiml(_join_text(outbound))
 
 
@@ -140,11 +158,12 @@ async def sms_webhook(request: Request, Body: str = Form(""), From: str = Form("
     if not _validate_twilio(request, form):
         return Response(status_code=403)
     user_id = f"sms:{From}" if From and not From.startswith("sms:") else (From or "sms:unknown")
-    log.info("Inbound SMS from %s: %s", user_id, Body)
+    text = await _inbound_text(form, Body)
+    log.info("Inbound SMS from %s: %s", user_id, text)
     if companion.cfg.humanize_timing:
-        asyncio.create_task(_reply_persistently(user_id, Body or ""))
+        asyncio.create_task(_reply_persistently(user_id, text))
         return _twiml()
-    outbound = await asyncio.to_thread(companion.handle_message, user_id, Body or "")
+    outbound = await asyncio.to_thread(companion.handle_message, user_id, text)
     return _twiml(_join_text(outbound))
 
 
