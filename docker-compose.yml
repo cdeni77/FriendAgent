@@ -1,0 +1,31 @@
+# Runs the whole agent: webhook server + scheduler (check-ins, follow-ups,
+# spontaneous outreach, restart-safe delivery backstop).
+#
+#   cp .env.example .env   # fill in your keys
+#   docker compose up -d
+#
+# Both services share ./data for the SQLite DB and generated media.
+
+services:
+  web:
+    build: .
+    env_file: .env
+    environment:
+      FRIENDAGENT_DB_PATH: /data/friendagent.db
+      FRIENDAGENT_MEDIA_DIR: /data/media_out
+    volumes:
+      - ./data:/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  scheduler:
+    build: .
+    command: python -m friendagent.scheduler
+    env_file: .env
+    environment:
+      FRIENDAGENT_DB_PATH: /data/friendagent.db
+      FRIENDAGENT_MEDIA_DIR: /data/media_out
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

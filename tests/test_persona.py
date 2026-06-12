@@ -38,3 +38,10 @@ def test_relationship_flips_via_field():
     lover = build_system_prompt(_persona(relationship="lover"))
     sibling = build_system_prompt(_persona(relationship="sibling"))
     assert lover != sibling
+
+
+def test_charter_has_anti_sycophancy_and_no_dark_patterns():
+    prompt = build_system_prompt(_persona())
+    assert "yes-man" in prompt          # anti-sycophancy
+    assert "guilt" in prompt            # no retention dark patterns
+    assert "escalate_to_family" in prompt  # emergency instruction

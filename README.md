@@ -175,6 +175,18 @@ voice/photo), delivered with human pacing.
 > photos are the persona's voice/pictures — keep that line clean. See
 > `docs/CONSENT.md`.
 
+## Deploying (one command)
+
+```bash
+cp .env.example .env   # fill in your keys
+docker compose up -d
+```
+
+This runs both processes: the webhook server (port 8000) and the scheduler
+(check-ins, follow-ups, spontaneous outreach, restart-safe delivery backstop),
+sharing `./data` for the database and generated media. Point your Twilio
+webhooks + `FRIENDAGENT_PUBLIC_BASE_URL` at the server's public URL.
+
 ## Configuration
 
 Everything is driven by environment variables (`.env`) and `config/persona.yaml`.

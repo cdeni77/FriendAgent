@@ -5,5 +5,7 @@ __pycache__/
 config/persona.yaml
 *.db
 *.sqlite3
+data/
+media_out/
 .pytest_cache/
 .DS_Store

@@ -20,18 +20,27 @@ class Notifier:
     def __init__(self, cfg: Config):
         self.cfg = cfg
 
+    _WELLBEING = {"self_harm", "medical_emergency", "agent_escalation"}
+
     def alert(self, user_id: str, message_text: str, result: SafetyResult) -> None:
-        subject = f"[FriendAgent] Possible scam contact — severity {result.severity.name}"
+        wellbeing = bool(self._WELLBEING.intersection(result.categories))
+        kind = "Wellbeing emergency" if wellbeing else "Possible scam contact"
+        next_step = (
+            "Suggested next step: CALL HER NOW. If she may be in immediate "
+            "danger, call emergency services."
+            if wellbeing else
+            "Suggested next step: call her, talk it through gently, and make sure "
+            "no money, gift cards, or account details are sent to anyone."
+        )
+        subject = f"[FriendAgent] {kind} — severity {result.severity.name}"
         body = (
-            "FriendAgent flagged a message your relative sent or received as a "
-            "possible scam.\n\n"
+            f"FriendAgent flagged a message from your relative: {kind.lower()}.\n\n"
             f"From/conversation: {user_id}\n"
             f"Severity: {result.severity.name}\n"
             f"Categories: {', '.join(result.categories) or 'n/a'}\n"
             f"Why: {result.rationale}\n\n"
             f"Message:\n{message_text}\n\n"
-            "Suggested next step: call her, talk it through gently, and make sure "
-            "no money, gift cards, or account details are sent to anyone."
+            f"{next_step}"
         )
         log.warning("SAFETY ALERT (%s): %s", result.severity.name, body)
         self._email(subject, body)

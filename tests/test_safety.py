@@ -42,3 +42,15 @@ def test_single_weak_signal_is_low_not_alert():
     r = safety.assess("It's urgent that I water the garden today.")
     assert r.severity <= Severity.LOW
     assert not r.is_flagged
+
+
+def test_self_harm_is_high():
+    r = safety.assess("Some days I feel like there's no reason to go on.")
+    assert r.severity == Severity.HIGH
+    assert "self_harm" in r.categories
+
+
+def test_medical_emergency_is_high():
+    r = safety.assess("I have chest pain and I'm very dizzy.")
+    assert r.severity == Severity.HIGH
+    assert "medical_emergency" in r.categories

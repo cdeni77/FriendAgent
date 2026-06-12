@@ -93,9 +93,24 @@ _PATTERNS: dict[str, tuple[list[re.Pattern], int]] = {
         ],
         2,
     ),
+    # Wellbeing emergencies — not scams, but the family must know immediately.
+    "self_harm": (
+        [
+            re.compile(r"\b(kill myself|end my life|don'?t want to (live|be here)|suicide|hurt myself)\b", re.I),
+            re.compile(r"\b(no reason to go on|better off without me|want to die)\b", re.I),
+        ],
+        4,
+    ),
+    "medical_emergency": (
+        [
+            re.compile(r"\b(chest pain|can'?t breathe|trouble breathing|stroke|i fell and can'?t)\b", re.I),
+            re.compile(r"\b(call (an )?ambulance|need a doctor right now|bleeding badly|i('| a)?m very dizzy)\b", re.I),
+        ],
+        4,
+    ),
 }
 
-_HIGH_RISK_CATEGORIES = {"gift_cards", "secrecy"}
+_HIGH_RISK_CATEGORIES = {"gift_cards", "secrecy", "self_harm", "medical_emergency"}
 
 
 def screen(text: str) -> SafetyResult:
