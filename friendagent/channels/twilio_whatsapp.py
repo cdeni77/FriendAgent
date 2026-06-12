@@ -33,3 +33,21 @@ class TwilioWhatsAppChannel(Channel):
             body=text,
         )
         log.info("Sent WhatsApp message to %s", to_addr)
+
+    def send_media(self, to: str, media_path: str, caption: str = "") -> None:
+        import os
+
+        if not self.cfg.public_base_url:
+            log.warning("No FRIENDAGENT_PUBLIC_BASE_URL set; sending caption only")
+            if caption:
+                self.send(to, caption)
+            return
+        to_addr = to if to.startswith("whatsapp:") else f"whatsapp:{to}"
+        url = f"{self.cfg.public_base_url.rstrip('/')}/media/{os.path.basename(media_path)}"
+        self._client.messages.create(
+            to=to_addr,
+            from_=self.cfg.twilio_whatsapp_from,
+            body=caption or None,
+            media_url=[url],
+        )
+        log.info("Sent WhatsApp media to %s (%s)", to_addr, url)

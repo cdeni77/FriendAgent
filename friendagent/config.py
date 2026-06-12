@@ -110,6 +110,32 @@ class Config:
     spontaneous_interval_min: int = 120    # how often to consider reaching out
     spontaneous_prob: float = 0.25         # chance, per contact, per consideration
 
+    # Agent (tool-use loop): lets the model decide to remember, share, send
+    # voice/photos, follow up, or quietly alert family.
+    agent_enabled: bool = True
+    agent_max_iters: int = 6
+
+    # Voice notes (ElevenLabs). Pick ONE voice_id and it's used for every note,
+    # so he always sounds like the same person.
+    voice_enabled: bool = False
+    elevenlabs_api_key: Optional[str] = None
+    voice_id: str = ""
+    voice_model: str = "eleven_multilingual_v2"
+
+    # Photos (reference-based generation, so it's always the same face).
+    photos_enabled: bool = False
+    image_provider: str = "openai"
+    openai_api_key: Optional[str] = None
+    image_model: str = "gpt-image-1"
+    persona_appearance: str = ""           # fixed description, included every time
+    reference_image_path: str = ""         # the locked canonical portrait
+    image_size: str = "1024x1024"
+
+    # Media output + hosting. public_base_url must point at this server so Twilio
+    # can fetch generated audio/images (e.g. an ngrok/https URL).
+    media_dir: str = "media_out"
+    public_base_url: str = ""
+
 
 def load_config() -> Config:
     return Config(
@@ -173,4 +199,19 @@ def load_config() -> Config:
         spontaneous_enabled=_bool("FRIENDAGENT_SPONTANEOUS_ENABLED", True),
         spontaneous_interval_min=int(os.getenv("FRIENDAGENT_SPONTANEOUS_INTERVAL_MIN", "120")),
         spontaneous_prob=float(os.getenv("FRIENDAGENT_SPONTANEOUS_PROB", "0.25")),
+        agent_enabled=_bool("FRIENDAGENT_AGENT_ENABLED", True),
+        agent_max_iters=int(os.getenv("FRIENDAGENT_AGENT_MAX_ITERS", "6")),
+        voice_enabled=_bool("FRIENDAGENT_VOICE_ENABLED", False),
+        elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
+        voice_id=os.getenv("FRIENDAGENT_VOICE_ID", ""),
+        voice_model=os.getenv("FRIENDAGENT_VOICE_MODEL", "eleven_multilingual_v2"),
+        photos_enabled=_bool("FRIENDAGENT_PHOTOS_ENABLED", False),
+        image_provider=os.getenv("FRIENDAGENT_IMAGE_PROVIDER", "openai"),
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
+        image_model=os.getenv("FRIENDAGENT_IMAGE_MODEL", "gpt-image-1"),
+        persona_appearance=os.getenv("FRIENDAGENT_PERSONA_APPEARANCE", ""),
+        reference_image_path=os.getenv("FRIENDAGENT_REFERENCE_IMAGE_PATH", ""),
+        image_size=os.getenv("FRIENDAGENT_IMAGE_SIZE", "1024x1024"),
+        media_dir=os.getenv("FRIENDAGENT_MEDIA_DIR", "media_out"),
+        public_base_url=os.getenv("FRIENDAGENT_PUBLIC_BASE_URL", ""),
     )

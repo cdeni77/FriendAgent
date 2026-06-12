@@ -55,6 +55,17 @@ class Memory:
                 value TEXT,
                 PRIMARY KEY (user_id, key)
             );
+
+            CREATE TABLE IF NOT EXISTS followups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                due_ts REAL NOT NULL,
+                created_ts REAL NOT NULL,
+                done INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_followups_due
+                ON followups(done, due_ts);
             """
         )
         self._conn.commit()
@@ -116,6 +127,32 @@ class Memory:
             "SELECT value FROM state WHERE user_id = ? AND key = ?", (user_id, key)
         ).fetchone()
         return row["value"] if row else None
+
+    # ---- follow-ups -----------------------------------------------------
+    def add_followup(self, user_id: str, topic: str, due_ts: float) -> None:
+        now = time.time()
+        self._conn.execute(
+            "INSERT INTO followups (user_id, topic, due_ts, created_ts, done) "
+            "VALUES (?, ?, ?, ?, 0)",
+            (user_id, topic, due_ts, now),
+        )
+        self._conn.commit()
+
+    def due_followups(self, now_ts: Optional[float] = None) -> list[tuple[int, str, str]]:
+        """Return (id, user_id, topic) for follow-ups whose time has come."""
+        now_ts = now_ts if now_ts is not None else time.time()
+        rows = self._conn.execute(
+            "SELECT id, user_id, topic FROM followups WHERE done = 0 AND due_ts <= ? "
+            "ORDER BY due_ts",
+            (now_ts,),
+        ).fetchall()
+        return [(r["id"], r["user_id"], r["topic"]) for r in rows]
+
+    def mark_followup_done(self, followup_id: int) -> None:
+        self._conn.execute(
+            "UPDATE followups SET done = 1 WHERE id = ?", (followup_id,)
+        )
+        self._conn.commit()
 
     def known_user_ids(self) -> list[str]:
         rows = self._conn.execute(

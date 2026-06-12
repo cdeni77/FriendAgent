@@ -69,3 +69,8 @@ class ChannelRouter(Channel):
         channel, dest = parse_address(to)
         self._channel(channel).send(dest, text)
         log.info("Routed message to %s via %s", dest, channel)
+
+    def send_media(self, to: str, media_path: str, caption: str = "") -> None:
+        channel, dest = parse_address(to)
+        self._channel(channel).send_media(dest, media_path, caption)
+        log.info("Routed media to %s via %s", dest, channel)

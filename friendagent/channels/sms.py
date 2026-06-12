@@ -29,3 +29,21 @@ class TwilioSMSChannel(Channel):
             body=text,
         )
         log.info("Sent SMS to %s", to)
+
+    def send_media(self, to: str, media_path: str, caption: str = "") -> None:
+        import os
+
+        if not self.cfg.public_base_url:
+            log.warning("No FRIENDAGENT_PUBLIC_BASE_URL set; sending caption only")
+            if caption:
+                self.send(to, caption)
+            return
+        url = f"{self.cfg.public_base_url.rstrip('/')}/media/{os.path.basename(media_path)}"
+        # MMS — media is delivered as a picture/audio message.
+        self._client.messages.create(
+            to=to,
+            from_=self.cfg.twilio_sms_from,
+            body=caption or None,
+            media_url=[url],
+        )
+        log.info("Sent MMS to %s (%s)", to, url)

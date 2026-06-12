@@ -140,6 +140,38 @@ She knows it's an AI, but the messaging is meant to *feel* human:
 > survive a server restart you'd move them to a durable queue/scheduler; the
 > current scaffold keeps them in memory.
 
+## Agentic core (tools)
+
+Replies run through a Claude **tool-use loop** (`friendagent/agent.py`), so the
+model doesn't just talk — it *decides* to act like a devoted partner:
+
+| Tool | What he does |
+|---|---|
+| `remember` / `recall` | Keeps and uses durable facts about her so his affection feels knowing, not generic. |
+| `share_find` | Finds a real article/recipe/video/poem about her interests (via Claude web search) and sends it with a loving note — "saw this and thought of you." |
+| `send_voice_note` | Speaks to her in his own fixed voice (ElevenLabs) — lovely for good-morning/goodnight. |
+| `send_photo` | Sends a photo of himself, generated from a locked reference portrait so it's always the same face. |
+| `schedule_followup` | Circles back later ("how did your appointment go?") — handled by the scheduler. |
+| `escalate_to_family` | Quietly alerts you if she's in danger, in a health crisis, or being pressured for money/secrecy. |
+
+Turn the whole loop off with `FRIENDAGENT_AGENT_ENABLED=false` for a plain
+reply-only bot. Replies come back as a list of messages (text bubbles + any
+voice/photo), delivered with human pacing.
+
+## Voice & photos — one consistent person
+
+- **Voice:** pick one ElevenLabs `FRIENDAGENT_VOICE_ID` and every voice note uses
+  it, so he always sounds the same. Enable with `FRIENDAGENT_VOICE_ENABLED=true`.
+- **Photos:** set `FRIENDAGENT_REFERENCE_IMAGE_PATH` to one locked portrait; each
+  photo is generated from that reference + a fixed `FRIENDAGENT_PERSONA_APPEARANCE`
+  so it's the same face in new scenes. Enable with `FRIENDAGENT_PHOTOS_ENABLED=true`.
+- Generated files are written to `FRIENDAGENT_MEDIA_DIR` and served from `/media`;
+  set `FRIENDAGENT_PUBLIC_BASE_URL` so Twilio can fetch them over WhatsApp/SMS.
+
+> Honesty note: she's told it's an AI, and it stays honest if she asks. Voice and
+> photos are the persona's voice/pictures — keep that line clean. See
+> `docs/CONSENT.md`.
+
 ## Configuration
 
 Everything is driven by environment variables (`.env`) and `config/persona.yaml`.

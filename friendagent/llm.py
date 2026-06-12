@@ -9,8 +9,6 @@ import json
 import logging
 from typing import Any, Optional
 
-import anthropic
-
 from .memory import Message
 
 log = logging.getLogger("friendagent.llm")
@@ -19,6 +17,8 @@ log = logging.getLogger("friendagent.llm")
 class LLM:
     def __init__(self, model: str, api_key: Optional[str] = None):
         self.model = model
+        import anthropic  # lazy: package imports fine without the SDK installed
+
         # The SDK reads ANTHROPIC_API_KEY from the env if api_key is None.
         self.client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
 
@@ -68,6 +68,33 @@ class LLM:
         except json.JSONDecodeError:
             log.warning("classify(): could not parse JSON: %r", text[:200])
             return None
+
+    # ---- web lookup (for sharing articles/recipes/clips) ---------------
+    def web_lookup(self, topic: str) -> str:
+        """Find one genuinely nice, real link about `topic` to share with her.
+
+        Uses Claude's server-side web search. Returns a short description plus
+        the URL, or "" on failure so the caller can skip gracefully.
+        """
+        try:
+            resp = self.client.messages.create(
+                model=self.model,
+                max_tokens=600,
+                system=(
+                    "Find ONE genuinely lovely, real, currently-available link "
+                    "(article, recipe, short video, or poem) about the topic, "
+                    "suitable to share with an older person you care about. "
+                    "Reply with a warm one-sentence description followed by the "
+                    "URL on its own line. If nothing good, reply 'NONE'."
+                ),
+                messages=[{"role": "user", "content": topic}],
+                tools=[{"type": "web_search_20260209", "name": "web_search"}],
+            )
+        except Exception as exc:
+            log.warning("web_lookup failed: %s", exc)
+            return ""
+        text = _first_text(resp).strip()
+        return "" if text.upper().startswith("NONE") else text
 
     # ---- fact extraction -----------------------------------------------
     def extract_facts(self, recent: list[Message]) -> dict[str, str]:

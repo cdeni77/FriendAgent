@@ -55,6 +55,20 @@ def run_checkins(companion: Companion, router: ChannelRouter, occasion: str | No
             log.error("Check-in to %s failed: %s", user_id, exc)
 
 
+def run_due_followups(companion: Companion, router: ChannelRouter) -> None:
+    """Send any scheduled follow-ups whose time has come (respecting quiet hours)."""
+    if humanize.seconds_until_active(companion.cfg) > 0:
+        return
+    for followup_id, user_id, topic in companion.memory.due_followups():
+        try:
+            msg = companion.followup_message(user_id, topic)
+            delivery.deliver(router, user_id, msg, companion.cfg)
+            companion.memory.mark_followup_done(followup_id)
+            log.info("Follow-up sent to %s about %r", user_id, topic)
+        except Exception as exc:
+            log.error("Follow-up to %s failed: %s", user_id, exc)
+
+
 def maybe_spontaneous(companion: Companion, router: ChannelRouter) -> None:
     cfg = companion.cfg
     if not cfg.spontaneous_enabled:
@@ -102,6 +116,15 @@ def main() -> None:
             "Spontaneous outreach every %dmin (p=%.2f per contact)",
             cfg.spontaneous_interval_min, cfg.spontaneous_prob,
         )
+
+    # Check for due follow-ups frequently so "ask her about X later" lands on time.
+    scheduler.add_job(
+        run_due_followups,
+        IntervalTrigger(minutes=15),
+        args=[companion, router],
+        id="followups",
+    )
+    log.info("Follow-up checks every 15min")
 
     log.info("Scheduler running. Ctrl-C to stop.")
     try:

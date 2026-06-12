@@ -10,3 +10,8 @@ class ConsoleChannel(Channel):
 
     def send(self, to: str, text: str) -> None:
         print(f"\n{self.persona_name}: {text}\n")
+
+    def send_media(self, to: str, media_path: str, caption: str = "") -> None:
+        label = "voice note" if media_path.endswith(".mp3") else "photo"
+        extra = f' — "{caption}"' if caption else ""
+        print(f"\n{self.persona_name}: [{label}: {media_path}]{extra}\n")
