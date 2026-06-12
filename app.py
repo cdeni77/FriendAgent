@@ -23,7 +23,7 @@ import logging
 
 from fastapi import FastAPI, Form, Request, Response
 
-from friendagent import humanize
+from friendagent import delivery, humanize
 from friendagent.channels.email import EmailChannel
 from friendagent.channels.router import ChannelRouter
 from friendagent.companion import Companion
@@ -89,7 +89,10 @@ async def whatsapp_webhook(request: Request, Body: str = Form(""), From: str = F
     log.info("Inbound WhatsApp from %s: %s", user_id, Body)
     if companion.cfg.humanize_timing:
         asyncio.create_task(
-            _reply_after_delay(user_id, Body or "", lambda r: router.send(user_id, r))
+            _reply_after_delay(
+                user_id, Body or "",
+                lambda r: delivery.deliver(router, user_id, r, companion.cfg),
+            )
         )
         return _twiml()  # ack now; the real reply arrives later
     reply = await asyncio.to_thread(companion.handle_message, user_id, Body or "")
@@ -105,7 +108,10 @@ async def sms_webhook(request: Request, Body: str = Form(""), From: str = Form("
     log.info("Inbound SMS from %s: %s", user_id, Body)
     if companion.cfg.humanize_timing:
         asyncio.create_task(
-            _reply_after_delay(user_id, Body or "", lambda r: router.send(user_id, r))
+            _reply_after_delay(
+                user_id, Body or "",
+                lambda r: delivery.deliver(router, user_id, r, companion.cfg),
+            )
         )
         return _twiml()
     reply = await asyncio.to_thread(companion.handle_message, user_id, Body or "")

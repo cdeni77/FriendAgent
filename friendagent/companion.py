@@ -73,17 +73,37 @@ class Companion:
         return reply
 
     # ---- proactive check-in --------------------------------------------
-    def proactive_checkin(self, user_id: str) -> str:
-        """Generate and store a warm, unprompted message to send her."""
+    _OCCASION_HINTS = {
+        "morning": (
+            "It's morning. Send a warm good-morning text to start her day."
+        ),
+        "evening": (
+            "It's evening. Send a warm message asking how her day went."
+        ),
+        "spontaneous": (
+            "Reach out unprompted, just because you were thinking of her — a "
+            "little 'thinking of you' or a follow-up on something she mentioned."
+        ),
+    }
+
+    def proactive_checkin(self, user_id: str, occasion: str | None = None) -> str:
+        """Generate and store a warm, unprompted message to send her.
+
+        `occasion` ("morning", "evening", "spontaneous") shapes the opener.
+        """
         system_prompt = build_system_prompt(
             self.persona, self.memory.facts_summary(user_id)
         )
         recent = self.memory.recent_messages(user_id, limit=8)
         context = "\n".join(f"{m.role}: {m.content}" for m in recent)
-        instruction = (
-            "Write a short, warm check-in message to start a conversation with "
-            "her now, unprompted. Reference something she's mentioned before if "
-            "you can, and ask one gentle question. Keep it to a sentence or two."
+        instruction = self._OCCASION_HINTS.get(
+            occasion or "",
+            "Write a short, warm check-in message to start a conversation now, "
+            "unprompted.",
+        )
+        instruction += (
+            " Reference something she's mentioned before if you can, and ask one "
+            "gentle question. Keep it short — a sentence or two."
         )
         if context:
             instruction += "\n\nRecent conversation for context:\n" + context

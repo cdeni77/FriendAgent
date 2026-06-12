@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 
+from . import delivery
 from .companion import Companion
 from .channels.console import ConsoleChannel
 
@@ -27,7 +28,7 @@ def main() -> None:
         "Type 'exit' to quit, '/checkin' for a proactive message.\n"
     )
     # Open with a proactive hello.
-    channel.send(LOCAL_USER, companion.proactive_checkin(LOCAL_USER))
+    delivery.deliver(channel, LOCAL_USER, companion.proactive_checkin(LOCAL_USER, "morning"), companion.cfg)
 
     try:
         while True:
@@ -40,10 +41,10 @@ def main() -> None:
             if text.lower() in {"exit", "quit"}:
                 break
             if text == "/checkin":
-                channel.send(LOCAL_USER, companion.proactive_checkin(LOCAL_USER))
+                delivery.deliver(channel, LOCAL_USER, companion.proactive_checkin(LOCAL_USER), companion.cfg)
                 continue
             reply = companion.handle_message(LOCAL_USER, text)
-            channel.send(LOCAL_USER, reply)
+            delivery.deliver(channel, LOCAL_USER, reply, companion.cfg)
     finally:
         companion.close()
         print("\nGoodbye.")

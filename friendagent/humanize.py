@@ -9,6 +9,7 @@ night — replies that land during quiet hours are deferred to the morning.
 from __future__ import annotations
 
 import random
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -18,6 +19,57 @@ except Exception:  # pragma: no cover
     ZoneInfo = None  # type: ignore
 
 from .config import Config
+
+# The model may use this token on its own line to deliberately split a reply
+# into several separate texts (see persona.HUMAN_STYLE).
+BUBBLE_DELIM = "[[next]]"
+
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
+
+
+def _split_sentences(text: str) -> list[str]:
+    return [s.strip() for s in _SENTENCE_RE.split(text.strip()) if s.strip()]
+
+
+def split_bubbles(text: str, cfg: Config) -> list[str]:
+    """Turn a reply into one or more 'texts', for natural double-texting.
+
+    Priority: an explicit delimiter the model chose; otherwise, occasionally
+    split a multi-sentence reply on its own. Always returns at least one bubble.
+    """
+    text = (text or "").strip()
+    if not text:
+        return [""]
+    if not cfg.multi_message_enabled:
+        return [text]
+
+    if BUBBLE_DELIM in text:
+        parts = [p.strip() for p in text.split(BUBBLE_DELIM) if p.strip()]
+        return _cap_bubbles(parts, cfg.max_bubbles) if parts else [text]
+
+    if random.random() < cfg.multi_bubble_prob:
+        sentences = _split_sentences(text)
+        if len(sentences) >= 2:
+            return _cap_bubbles(sentences, cfg.max_bubbles)
+    return [text]
+
+
+def _cap_bubbles(bubbles: list[str], max_bubbles: int) -> list[str]:
+    """Limit the number of bubbles, merging the overflow into the last one."""
+    if max_bubbles < 1:
+        max_bubbles = 1
+    if len(bubbles) <= max_bubbles:
+        return bubbles
+    head = bubbles[: max_bubbles - 1]
+    tail = " ".join(bubbles[max_bubbles - 1:])
+    return head + [tail]
+
+
+def inter_bubble_delay(next_bubble: str, cfg: Config) -> float:
+    """Typing pause before the next text in a double-text sequence."""
+    typing = len(next_bubble) / max(cfg.typing_cps, 1.0)
+    delay = typing + random.uniform(0, cfg.reply_jitter_sec / 2)
+    return min(max(delay, cfg.inter_bubble_min_sec), cfg.inter_bubble_max_sec)
 
 
 def _parse_quiet(spec: str) -> Optional[tuple[int, int]]:

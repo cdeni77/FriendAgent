@@ -97,6 +97,19 @@ class Config:
     long_delay_max_sec: float = 14400.0    # ... up to 4 hours
     quiet_hours: str = "22:00-08:00"       # don't message her during this window
 
+    # Multi-message ("double texting") — fire off 2-3 short texts in a row.
+    multi_message_enabled: bool = True
+    multi_bubble_prob: float = 0.35        # chance to split a single-block reply
+    max_bubbles: int = 3
+    inter_bubble_min_sec: float = 2.0      # typing pause between texts (min)
+    inter_bubble_max_sec: float = 12.0     # typing pause between texts (max)
+
+    # Proactive initiation — the agent reaches out on its own, not just replies.
+    checkin_jitter_sec: float = 1200.0     # +/- randomness on scheduled check-ins
+    spontaneous_enabled: bool = True
+    spontaneous_interval_min: int = 120    # how often to consider reaching out
+    spontaneous_prob: float = 0.25         # chance, per contact, per consideration
+
 
 def load_config() -> Config:
     return Config(
@@ -151,4 +164,13 @@ def load_config() -> Config:
         long_delay_min_sec=float(os.getenv("FRIENDAGENT_LONG_DELAY_MIN_SEC", "600")),
         long_delay_max_sec=float(os.getenv("FRIENDAGENT_LONG_DELAY_MAX_SEC", "14400")),
         quiet_hours=os.getenv("FRIENDAGENT_QUIET_HOURS", "22:00-08:00"),
+        multi_message_enabled=_bool("FRIENDAGENT_MULTI_MESSAGE", True),
+        multi_bubble_prob=float(os.getenv("FRIENDAGENT_MULTI_BUBBLE_PROB", "0.35")),
+        max_bubbles=int(os.getenv("FRIENDAGENT_MAX_BUBBLES", "3")),
+        inter_bubble_min_sec=float(os.getenv("FRIENDAGENT_INTER_BUBBLE_MIN_SEC", "2")),
+        inter_bubble_max_sec=float(os.getenv("FRIENDAGENT_INTER_BUBBLE_MAX_SEC", "12")),
+        checkin_jitter_sec=float(os.getenv("FRIENDAGENT_CHECKIN_JITTER_SEC", "1200")),
+        spontaneous_enabled=_bool("FRIENDAGENT_SPONTANEOUS_ENABLED", True),
+        spontaneous_interval_min=int(os.getenv("FRIENDAGENT_SPONTANEOUS_INTERVAL_MIN", "120")),
+        spontaneous_prob=float(os.getenv("FRIENDAGENT_SPONTANEOUS_PROB", "0.25")),
     )

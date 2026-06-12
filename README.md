@@ -124,6 +124,18 @@ She knows it's an AI, but the messaging is meant to *feel* human:
   `FRIENDAGENT_QUIET_HOURS`, …) — nothing is hardcoded. See
   `friendagent/humanize.py`.
 
+- **Double texting** — sometimes it fires off 2–3 short texts in a row instead
+  of one block, with a typing pause between them. The model can split
+  deliberately (a `[[next]]` marker) and there's a probabilistic splitter as
+  backup. Email is always a single message. Tunable via
+  `FRIENDAGENT_MULTI_MESSAGE`, `FRIENDAGENT_MULTI_BUBBLE_PROB`,
+  `FRIENDAGENT_MAX_BUBBLES`. (`friendagent/delivery.py`)
+- **Reaches out first** — the scheduler sends time-aware good-morning / evening
+  check-ins (with random jitter so they're not exact), and occasional
+  spontaneous "thinking of you" messages so the agent isn't purely reactive.
+  Tunable via `FRIENDAGENT_CHECKIN_JITTER_SEC`, `FRIENDAGENT_SPONTANEOUS_*`.
+  Quiet hours are always respected. (`friendagent/scheduler.py`)
+
 > Note: delayed replies are scheduled in-process. For long "busy" gaps to
 > survive a server restart you'd move them to a durable queue/scheduler; the
 > current scaffold keeps them in memory.
